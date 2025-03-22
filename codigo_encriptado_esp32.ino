@@ -15,15 +15,15 @@ WiFiServer server(80);
 
 // const char* ssid = "LATINA_OPEN";
 // const char* password = "";
-const char* ssid = ".TigoWiFi-307776204/0";
-const char* password = "WiFi-94330935";
+const char* ssid = "";
+const char* password = "";
 
 //Funcion para inicializar WiFi
 void initWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   WiFi.setAutoReconnect(true); //Para conexion inestable
-  WiFi.persistent(true); // se intenta reconectar
+  WiFi.persistent(true);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -34,7 +34,6 @@ void initWiFi() {
   Serial.println(WiFi.localIP());
 
   server.begin(); // Inicia el servidor
-  //server.setTimeout(2000);
 }
 
 void generateHexValues(int length, char output[][5]) {
@@ -49,16 +48,11 @@ char correctPass[] = "abc123"; // La contraseña real en texto plano (debe cifra
 
 bool session_active = false;
 
-char header[500];
-int bufferSize = 0;
-int LED = 2; // Pin digital para el LED
-String estado = "OFF"; // Estado del LED inicialmente "OFF"
+//String estado = "OFF"; // Estado del LED inicialmente "OFF"
 
 void setup() 
 {
   Serial.begin(115200);// Open serial communications and wait for port to open:
-  // start the Ethernet connection and the server:
-  // Set WiFi to station mode and disconnect from an AP if it was previously connected
   delay(1000);
   initWiFi();
 
@@ -68,50 +62,49 @@ void setup()
 void loop() 
 {
   WiFiClient client = server.available();
-    // Maneja las solicitudes HTTP entrantes
-
-  if (client) {
-      Serial.println("New client connected");
-      // an http request ends with a blank line
-      
-      String request = readRequest(client);
-      
-      if (request.indexOf("POST /login") != -1) {
-        handleLogin(client);
-      } else if (session_active) {
+  // Maneja las solicitudes HTTP entrantes
+  String headers = "";
+  String body = "";
+  bool isBody = false;
+  if (client) {   
+    delay(100);
+    if (client.connected()) {
+      Serial.println("Client connected");
+      while (client.available()) {
+        char c = client.read();
+        // Leer encabezados hasta encontrar la línea en blanco
+        if (!isBody) {
+            headers += c;
+            if (headers.endsWith("\r\n\r\n")) {
+                isBody = true; // La siguiente parte será el cuerpo
+            }
+        } else {
+            // Leer el cuerpo del request
+            body += c;
+        }
+      }   
+      Serial.println("Headers:");
+      Serial.println(headers);
+      Serial.println("Body:");
+      Serial.println(body);
+      Serial.println("");
+      if (headers.indexOf("POST /login") != -1) {
+        handleLogin(client,body);
+      } else if (headers.indexOf("GET /led") != -1 && session_active) {
         serveResponsePage(client);
-        handleLED(client);
+        handleLED(client,headers);
       } else {
         serveLoginPage(client);
       }
-
-      delay(500); 
-      client.flush(); 
-      client.stop();
-      Serial.println("Client disconnected");
-  }
-}//void loop
-
-// Leer la solicitud HTTP del cliente
-String readRequest(WiFiClient client) {
-    String request = "";
-    unsigned long timeout = millis() + 2000; // Espera máximo 1 segundo
-
-    while (client.available() && millis() < timeout) {
-        char c = client.read();
-        request += c;
-        timeout = millis() + 100;  // Extender tiempo mientras haya datos
-        if (c == '\n' && request.endsWith("\r\n\r\n")) {
-            break;  // Fin de la solicitud HTTP
-        }
     }
-    return request;
+    delay(100); 
+    client.flush(); 
+    client.stop();
+    Serial.println("Client disconnected");
+  } 
 }
-
 // Procesar login
-void handleLogin(WiFiClient client) {
-  String request = readRequest(client);
-
+void handleLogin(WiFiClient client, String request) {
   int userPos = request.indexOf("user=");
   int passPos = request.indexOf("pass=");
 
@@ -133,31 +126,27 @@ void handleLogin(WiFiClient client) {
   user.trim();
   pass.trim();
 
-  Serial.print("Usuario recibido: ");
-  Serial.println(user);
-  Serial.print("Contraseña recibida: ");
-  Serial.println(pass);
-
   if (user.equals(correctUser) && pass.equals(correctPass)) {
       session_active = true;
       Serial.println("Login exitoso!");
-      client.println("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n");
+      client.println("HTTP/1.1 200 OK");
+      client.println("Set-Cookie: session_id=1234; Path=/; HttpOnly");
+      client.println("Content-Type: text/html");
+      client.println();
+      client.println("<meta http-equiv='refresh' content='0; url=/led' />"); // Redirección
   } else {
       Serial.println("Login fallido: usuario o contraseña incorrectos.");
       client.println("HTTP/1.1 401 Unauthorized\r\nContent-Type: text/plain\r\n\r\nInvalid credentials");
+      client.println("Connection: close");
   }
 }
 //Controlar LED
-void handleLED(WiFiClient client) {
-  String request = readRequest(client);
-
+void handleLED(WiFiClient client, String request) {
   if (request.indexOf("led_status=on") != -1) {
       digitalWrite(LED_PIN, HIGH);
       Serial.println("LED encendido");
-      estado = "ON";
   } else if (request.indexOf("led_status=off") != -1) {
       digitalWrite(LED_PIN, LOW);
-      estado = "OFF";
       Serial.println("LED apagado");
   }
 }
@@ -251,7 +240,6 @@ void serveLoginPage(WiFiClient client) {
   client.println("</body>");
   client.println("</html>");
 }
-
 // Página de respuesta
 void serveResponsePage(WiFiClient client) {
   client.println("HTTP/1.1 200 OK");
@@ -262,38 +250,55 @@ void serveResponsePage(WiFiClient client) {
   client.println("<head>");
   client.println("<meta name='viewport' content='width=device-width, initial-scale=1.0' charset='utf-8'>");
   client.println("<style>");
-  client.println("body { ");
+  client.println("body {");
   client.println("background: linear-gradient(to bottom right, #3d3d3d, black) no-repeat;");
   client.println("height: 100vh;");
-  client.println("text-align: center; ");
+  client.println("text-align: center;");
   client.println("font-family: 'Trebuchet MS', sans-serif;");
   client.println("}");
   client.println(".white{");
-  client.println(" color:white;");
+  client.println("color:white;");
   client.println("}");
-  client.println("button { ");
-  client.println(" margin: 20px; ");
-  client.println(" padding: 15px; ");
-  client.println(" font-size: 20px; ");
-  client.println(" color: white; ");
-  client.println(" border: none; ");
-  client.println(" border-radius: 5px; ");
+  client.println("button {");
+  client.println("margin: 20px;");
+  client.println("padding: 15px;");
+  client.println("font-size: 20px;");
+  client.println("color: white;");
+  client.println("border: none;");
+  client.println("border-radius: 5px;");
   client.println("}");
-  client.println("#btn-bg-color{");
-  client.println(" position: absolute;");
-  client.println(" background-color: white;");
-  client.println(" width: 300px;");
-  client.println(" height: 100px;");
-  client.println(" border-radius: 50px;");
-  client.println(" margin-left: auto;");
-  client.println(" margin-right: auto;");
-  client.println(" z-index: -1;");
-  client.println(" transform: translateY(10px);");
+  client.println("#btn-bg-color {");
+  client.println("position: absolute;");
+  client.println("background-color: white;");
+  client.println("width: 80px;");
+  client.println("height: 80px;");
+  client.println("border-radius: 50px;");
+  client.println("left: 1%;");
+  client.println("top: 10%;");
+  client.println("filter: blur(2px);");
+  client.println("z-index: -5;");
+  client.println("transition: width 0.5s ease-in-out, height 0.5s ease-in-out, transform 0.5s ease-in-out;");
   client.println("}");
-  client.println("#btn-bg{ "); 
-  client.println("background: rgba( 255, 255, 255, 0.25); ");
+  client.println("/* Expande en dirección normal al hacer hover */");
+  client.println("#btnControl:hover ~ #btn-bg-color {");
+  client.println("transform: translate(-5px,-10px);");
+  client.println("width: 302px;");
+  client.println("height: 100px;");
+  client.println("}");
+  client.println("/* Se mueve a la derecha cuando está marcado */");
+  client.println("#btnControl:checked ~ #btn-bg-color {");
+  client.println("transform: translateX(215px);");
+  client.println("}");
+  client.println("/* Cuando está marcado y el mouse pasa por encima, crece en dirección opuesta */");
+  client.println("#btnControl:checked:hover ~ #btn-bg-color {");
+  client.println("width: 302px;");
+  client.println("height: 100px;");
+  client.println("transform: translate(-5px, -10px); /* Se mueve menos para expandirse a la izquierda */");
+  client.println("}");
+  client.println("#btn-bg{");
+  client.println("background: rgba( 255, 255, 255, 0.25 );");
   client.println("box-shadow: 0 5px 10px 0 grey;");
-  client.println("backdrop-filter: blur( 5px);");
+  client.println("backdrop-filter: blur( 5px );");
   client.println("-webkit-backdrop-filter: blur( 5px );");
   client.println("border-radius: 10px;");
   client.println("border: 1px solid rgba( 255, 255, 255, 0.18 );");
@@ -305,15 +310,12 @@ void serveResponsePage(WiFiClient client) {
   client.println("z-index: 1;");
   client.println("transition: box-shadow 0.25s ease-in-out;");
   client.println("}");
-  client.println("#btn-bg:hover {");
-  client.println(" box-shadow: 0 5px 20px 0 grey;");
-  client.println(" }");
   client.println("#btnControl {");
-  client.println(" display: none;");
+  client.println("display: none;");
   client.println("}");
   client.println("label.btn {");
-  client.println("display: block;/* Hace que el label se comporte como un bloque */");
-  client.println("width: 100%;/* Ocupa todo el ancho de #btn-bg */");
+  client.println("display: block;  /* Hace que el label se comporte como un bloque */");
+  client.println("width: 100%;  /* Ocupa todo el ancho de #btn-bg */");
   client.println("height: 100%; /* Ocupa todo el alto de #btn-bg */");
   client.println("cursor: pointer; /* Asegura que se muestre el cursor de clic */");
   client.println("top: 0;");
@@ -341,7 +343,6 @@ void serveResponsePage(WiFiClient client) {
   client.println("<h1 class='white'>Control LED via Web Server</h1>");
   client.println("<div class='white' style='margin-bottom: 10px;'><b>Estado del LED: <p id='statusText' style='display: inline;'></p></b></div>");
   client.println("<div id='btn-bg'>");
-  client.println(" <div id='btn-bg-color'></div>");
   client.println(" <form id='led-btn' method='GET' action='/led'>");
   client.println(" <input type='checkbox' id='btnControl' name='led_status'/>");
   client.println(" <label class='btn' for='btnControl'>");
@@ -351,32 +352,29 @@ void serveResponsePage(WiFiClient client) {
   client.println(" </g>");
   client.println(" </svg>");
   client.println(" </label>");
+  client.println(" <div id='btn-bg-color'></div>");
   client.println(" </form>");
   client.println("</div>");
   client.println("<script>"); 
   client.println("document.getElementById('btnControl').addEventListener('change', function() {");
   client.println("event.preventDefault();");
-  client.println("let statusText = document.getElementById('statusText');");  
-  client.println("if (this.checked) {");  
-  client.println("statusText.textContent = 'Encendido';"); 
+  client.println("let statusText = document.getElementById('statusText');");
+  client.println("if (this.checked) {");
   client.println("statusText.style.color = 'green';");
-  client.println("} else {"); 
-  client.println("statusText.textContent = 'Apagado';");  
-  client.println("statusText.style.color = 'red';");  
+  client.println("} else {");
+  client.println("statusText.style.color = 'red';");
   client.println("}");
-  client.println("statusText.style.opacity = '1';");  
+  client.println("statusText.style.opacity = '1';");
   client.println("let estado = this.checked ? 'on' : 'off'; // Determina el estado del LED");
-  client.println("// Enviar la solicitud usando fetch");  
+  client.println("// Enviar la solicitud usando fetch");
   client.println("fetch('/led?led_status=' + estado, { method: 'GET' })");
-  client.println(".then(response => response.text())");   
-  client.println(".then(data => {");  
-  client.println("console.log('Respuesta del servidor: ' + data); // Ver la respuesta en consola");   
-  client.println("statusText.textContent = estado.toUpperCase(); // Actualizar estado en pantalla");  
-  client.println("})");   
-  client.println(".catch(error => console.error('Error:', error));"); 
-  client.println("});");  
+  client.println(".then(response => response.text())");
+  client.println(".then(data => {");
+  client.println("statusText.textContent = estado.toUpperCase(); // Actualizar estado en pantalla");
+  client.println("})");
+  client.println(".catch(error => console.error('Error:', error));");
+  client.println("});"); 
   client.println("</script>");
   client.println("</body>");
   client.println("</html>");
 }
-
