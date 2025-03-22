@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" charset="utf-8">
+        <style>
+        body { 
+            background: linear-gradient(to bottom right, #3d3d3d, black) no-repeat;
+            height: 100vh;
+            text-align: center; 
+            font-family: 'Trebuchet MS', sans-serif;
+        }
+        .white{
+            color:white;
+        }
+        button { 
+            margin: 20px; 
+            padding: 15px; 
+            font-size: 20px; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+        }
+        #btn-bg-color{
+            position: absolute;
+            background-color: white;
+            width: 300px;
+            height: 100px;
+            border-radius: 50px;
+            margin-left: auto;
+            margin-right: auto;
+            z-index: -1;
+
+            transform: translateY(10px);
+        }  
+        #btn-bg{  
+            background: rgba( 255, 255, 255, 0.25 );
+            box-shadow: 0 5px 10px 0 grey;
+            backdrop-filter: blur( 5px );
+            -webkit-backdrop-filter: blur( 5px );
+            border-radius: 10px;
+            border: 1px solid rgba( 255, 255, 255, 0.18 );
+            width: 300px;
+            height: 100px;
+            border-radius: 50px;
+            margin-left: auto;
+            margin-right: auto;
+            z-index: 1;
+
+            transition: box-shadow 0.25s ease-in-out;
+        }
+        #btn-bg:hover {  
+            box-shadow: 0 5px 20px 0 grey;
+        }
+        #btnControl {
+            display: none;
+        }
+        label.btn {
+            display: block;  /* Hace que el label se comporte como un bloque */
+            width: 100%;  /* Ocupa todo el ancho de #btn-bg */
+            height: 100%; /* Ocupa todo el alto de #btn-bg */
+            cursor: pointer; /* Asegura que se muestre el cursor de clic */
+            top: 0;
+            left: 0;
+        }
+        #btnControl + label > svg {
+            z-index: 2;
+            fill:red;
+            opacity: 0.5;
+
+            transition: transform 0.5s ease-in-out, fill 0.25s ease-in-out;
+        }
+        #btnControl:checked + label > svg {
+            z-index: 2;
+            fill:green;
+            opacity: 0.5;
+
+            transform: translateX(215px);
+        }
+        #statusText {
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+        </style>
+    </head>
+    <body>
+        <h1 class="white">Control LED via Web Server</h1>
+        <div class="white" style="margin-bottom: 10px;"><b>Estado del LED: <p id="statusText" style="display: inline;"></p></b></div>
+        
+        <div id="btn-bg">
+            <div id="btn-bg-color"></div>
+            <form id="led-btn" onsubmit="return test(this)">
+            <input type="checkbox" id="btnControl"/>
+                <label class="btn" for="btnControl">
+                    <svg id="switch-button" xmlns="http://www.w3.org/2000/svg" version="1.0" width="300px" height="100px" viewBox="0 0 300.000000 100.000000" preserveAspectRatio="xMidYMid meet">
+                    <g transform="translate(5, 88) scale(0.025,-0.025)" stroke="none">
+                    <path d="M1295 2984 c-346 -53 -628 -197 -867 -442 -325 -335 -478 -794 -412 -1241 49 -336 180 -604 412 -843 524 -539 1330 -609 1951 -170 171 121 360 342 457 535 192 381 215 818 63 1212 -153 395 -470 712 -868 866 -224 87 -505 119 -736 83z m294 -412 c14 -10 35 -34 46 -53 18 -31 20 -55 23 -269 2 -129 0 -263 -3 -297 -11 -104 -70 -165 -160 -165 -58 0 -104 27 -132 78 -22 38 -23 47 -23 329 0 264 2 293 19 325 45 84 154 109 230 52z m-579 -262 c20 -5 51 -26 70 -45 29 -30 34 -43 38 -94 5 -68 -16 -114 -68 -151 -41 -29 -123 -135 -159 -207 -96 -189 -94 -422 6 -623 55 -110 179 -231 293 -288 105 -51 198 -73 310 -73 112 0 205 22 310 73 121 60 239 178 297 298 97 199 97 422 3 611 -34 68 -74 122 -151 205 -54 58 -64 85 -56 150 10 88 105 150 191 124 75 -23 227 -193 299 -335 47 -94 84 -226 97 -341 31 -302 -70 -591 -285 -808 -88 -89 -167 -144 -289 -202 -149 -70 -234 -88 -416 -88 -182 0 -267 18 -416 88 -122 58 -201 113 -289 202 -164 166 -261 371 -286 603 -32 307 77 600 301 815 93 89 132 105 200 86z"/>
+                    </g>
+                    </svg>
+                </label>
+            </form>
+        </div>
+        <script>
+            document.getElementById("btnControl").addEventListener("change", function() {
+                let statusText = document.getElementById("statusText");
+                if (this.checked) {
+                    statusText.textContent = "Encendido";
+                    statusText.style.color = "green";
+                } else {
+                    statusText.textContent = "Apagado";
+                    statusText.style.color = "red";
+                }
+                statusText.style.opacity = "1";
+
+                setTimeout(() => {
+                    document.getElementById("led-btn").submit();
+                }, 1100);
+                
+            });
+        </script>
+    </body>
+</html>
