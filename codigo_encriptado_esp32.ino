@@ -1,7 +1,14 @@
-#include <SPI.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <WebServer.h>
+#include "FS.h"
+#include "SPIFFS.h"
+#include <mbedtls/sha256.h>
 
 #define LED_PIN 2  // Onboard LED is usually on GPIO 2
+//Credenciales temporales
+char correctUser[] = "admin";
+char correctPass[] = "abc123";
 
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
@@ -13,11 +20,46 @@
 // (port 80 is default for HTTP):
 WiFiServer server(80);
 
-// const char* ssid = "LATINA_OPEN";
+// const char* ssid = "";
 // const char* password = "";
-const char* ssid = "";
-const char* password = "";
 
+
+int failedAttempts = 0;
+unsigned long lockoutTime = 0;
+bool session_active = false;
+
+//String estado = "OFF"; // Estado del LED inicialmente "OFF"
+//Funcion de hashing
+void hashPassword(const char* password, char outputBuffer[65]) {
+  unsigned char hash[32];
+  mbedtls_sha256_context ctx;
+  
+  mbedtls_sha256_init(&ctx);
+  mbedtls_sha256_starts(&ctx, 0);  // 0 para SHA-256
+  mbedtls_sha256_update(&ctx, (const unsigned char*)password, strlen(password));
+  mbedtls_sha256_finish(&ctx, hash);
+  mbedtls_sha256_free(&ctx);
+
+  for (int i = 0; i < 32; i++) {
+      sprintf(outputBuffer + (i * 2), "%02x", hash[i]);
+  }
+}
+//JWT Token generation
+String generateToken() {
+  char token[33];
+  for (int i = 0; i < 32; i++) {
+      token[i] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"[random(62)];
+  }
+  token[32] = '\0';
+  return String(token);
+}
+//Funcion para sanitizar entradas de usuario (Solo permite caracteres alfanuméricos)
+bool isValidInput(String input) {
+  for (unsigned int i = 0; i < input.length(); i++) {
+      if (!isalnum(input[i])) return false;
+  }
+  return true;
+}
 //Funcion para inicializar WiFi
 void initWiFi() {
   WiFi.mode(WIFI_STA);
@@ -28,40 +70,25 @@ void initWiFi() {
     delay(500);
     Serial.print(".");
   }
-
   Serial.println("\nConectado a WiFi.");
   Serial.print("Dirección IP: ");
   Serial.println(WiFi.localIP());
-
   server.begin(); // Inicia el servidor
 }
-
-void generateHexValues(int length, char output[][5]) {
-    for (int i = 0; i < length; i++) {
-        byte randomValue = random(0, 256); // Genera un valor entre 0x00 y 0xFF
-        sprintf(output[i], "0x%02X", randomValue); // Formatea en hexadecimal
-    }
-}
-
-char correctUser[] = "admin";
-char correctPass[] = "abc123"; // La contraseña real en texto plano (debe cifrarse)
-
-bool session_active = false;
-
-//String estado = "OFF"; // Estado del LED inicialmente "OFF"
 
 void setup() 
 {
   Serial.begin(115200);// Open serial communications and wait for port to open:
   delay(1000);
   initWiFi();
-
+  
   pinMode(LED_PIN,OUTPUT); // Pin digital 13 como salida
 }
 
 void loop() 
 {
   WiFiClient client = server.available();
+  
   // Maneja las solicitudes HTTP entrantes
   String headers = "";
   String body = "";
@@ -83,11 +110,10 @@ void loop()
             body += c;
         }
       }   
-      Serial.println("Headers:");
-      Serial.println(headers);
-      Serial.println("Body:");
-      Serial.println(body);
-      Serial.println("");
+      // Serial.println("Headers:");
+      // Serial.println(headers);
+      // Serial.println("Body");
+      // Serial.println(body);
       if (headers.indexOf("POST /login") != -1) {
         handleLogin(client,body);
       } else if (headers.indexOf("GET /led") != -1 && session_active) {
@@ -105,6 +131,14 @@ void loop()
 }
 // Procesar login
 void handleLogin(WiFiClient client, String request) {
+  if (failedAttempts >= 5 && millis() - lockoutTime < 60000) {  // 60 segundos de bloqueo
+    client.println("HTTP/1.1 429 Too Many Requests");
+    client.println("Retry-After: 60");
+    client.println("Content-Type: text/plain");
+    client.println();
+    client.println("Demasiados intentos fallidos. Intente nuevamente en 60 segundos.");
+    return;
+  }
   int userPos = request.indexOf("user=");
   int passPos = request.indexOf("pass=");
 
@@ -126,15 +160,27 @@ void handleLogin(WiFiClient client, String request) {
   user.trim();
   pass.trim();
 
+  if (!isValidInput(user) || !isValidInput(pass)) {
+      Serial.println("Error: User y Password deben ser alfanumericos.");
+      client.println("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nBad credentials");
+      return;
+  }
+
   if (user.equals(correctUser) && pass.equals(correctPass)) {
       session_active = true;
+      String token = generateToken();
+      failedAttempts = 0;
       Serial.println("Login exitoso!");
-      client.println("HTTP/1.1 200 OK");
-      client.println("Set-Cookie: session_id=1234; Path=/; HttpOnly");
+      client.println("HTTP/1.1 302 Found");  // Redirección HTTP
+      client.println("Location: /led");  // Redirigir a /led
+      client.println("Set-Cookie: token=" + token + "; Path=/; HttpOnly; SameSite=Strict");
       client.println("Content-Type: text/html");
       client.println();
-      client.println("<meta http-equiv='refresh' content='0; url=/led' />"); // Redirección
   } else {
+      failedAttempts++;
+      if (failedAttempts >= 5) {
+          lockoutTime = millis();
+      }
       Serial.println("Login fallido: usuario o contraseña incorrectos.");
       client.println("HTTP/1.1 401 Unauthorized\r\nContent-Type: text/plain\r\n\r\nInvalid credentials");
       client.println("Connection: close");

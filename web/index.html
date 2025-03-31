@@ -112,24 +112,24 @@
         </div>
         
         <script>
-        // document.getElementById("btnControl").addEventListener("change", function() {
-        //     event.preventDefault();
-        //     let statusText = document.getElementById('statusText');   
-        //     if (this.checked) {  
-        //         statusText.textContent = 'Encendido'; 
-        //         statusText.style.color = 'green';
-        //     } else { 
-        //         statusText.textContent = 'Apagado';  
-        //         statusText.style.color = 'red';  
-        //     }
-        //     statusText.style.opacity = '1';  
+        document.getElementById("btnControl").addEventListener("change", function() {
+            event.preventDefault();
+            let statusText = document.getElementById('statusText');   
+            if (this.checked) {  
+                statusText.textContent = 'Encendido'; 
+                statusText.style.color = 'green';
+            } else { 
+                statusText.textContent = 'Apagado';  
+                statusText.style.color = 'red';  
+            }
+            statusText.style.opacity = '1';  
 
-        //     let estado = this.checked ? 'on' : 'off'; // Determina el estado del LED
-        //     // Enviar la solicitud usando fetch  
-        //     fetch('/led?led_status=' + estado, { method: 'GET' })
-        //     .then(response => response.text())   
-        //     .catch(error => console.error('Error:', error)); 
-        // });  
+            let estado = this.checked ? 'on' : 'off'; // Determina el estado del LED
+            // Enviar la solicitud usando fetch  
+            fetch('/led?led_status=' + estado, { method: 'GET' })
+            .then(response => response.text())   
+            .catch(error => console.error('Error:', error)); 
+        });  
         </script>
     </body>
 </html>
