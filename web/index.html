@@ -3,14 +3,30 @@
     <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" charset="utf-8">
         <style>
+        /*    General use styles     */
+        .m-0 {margin: 0px !important;}
+        .m-1 {margin: 1em !important;}
+        .m-2 {margin: 2em !important;}
+        .border-0{border-radius: 0px !important;}
+        .float-start{float: left !important;}
+        .float-end{float: right !important;}
+        .glass {
+            color: white !important;
+            background: rgba( 255, 255, 255, 0.25 );
+            box-shadow: 0 8px 32px 0 rgba( 155, 155, 155, 0.37 );
+            backdrop-filter: blur( 5px );
+            -webkit-backdrop-filter: blur( 5px );
+            border-radius: 10px;
+            border: 1px solid rgba( 255, 255, 255, 0.18 );
+        }
+        .glass a {color: white;}
+        .white{color:white !important;}
+        /*    Specific styles    */
         body { 
             background: linear-gradient(to bottom right, #3d3d3d, black) no-repeat;
             height: 100vh;
             text-align: center; 
             font-family: 'Trebuchet MS', sans-serif;
-        }
-        .white{
-            color:white;
         }
         button { 
             margin: 20px; 
@@ -28,11 +44,10 @@
             border-radius: 50px;
             left: 1%;
             top: 10%;
-            filter: blur(2px);
+            filter: blur(15px);
             z-index: -5;
             transition: width 0.5s ease-in-out, height 0.5s ease-in-out, transform 0.5s ease-in-out;
         }  
-
         /* Expande en dirección normal al hacer hover */
         #btnControl:hover ~ #btn-bg-color {
             transform: translate(-5px,-10px);
@@ -91,17 +106,87 @@
             opacity: 0;
             transition: opacity 0.5s ease-in-out;
         }
+        #switch-button{
+            margin-left: -12.5em;
+            margin-right: auto;
+        }
+        /*   navbar styles   */
+        ul {
+            width: 100%;
+            height: 3em;
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        li {float: left;}
+        li a {
+          display: block;
+          text-align: center;
+          padding: 14px 16px;
+          text-decoration: none;
+        }
+        li a:hover:not(.active) {
+          background-color: grey;
+        }
+        .active {
+            color: black !important;
+          background-color: #FFFF;
+        }
+        /*    dropdown btn    */
+        .dropbtn {
+          padding: 16px;
+          font-size: 16px;
+          border: none;
+          cursor: pointer;
+        }
+        .dropdown {
+          display: inline-block;
+          overflow: hidden;
+        }
+        .dropdown-content {
+          display: none;
+          position: absolute;
+          min-width: 160px;
+          right: 0;
+          box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+          z-index: 0;
+        }
+        .dropdown-content a {
+          padding: 12px 16px;
+          text-decoration: none;
+          display: block;
+        }
+        .dropdown:hover .dropdown-content {
+          display: block;
+        }
         </style>
     </head>
-    <body>
+    <body class="m-0">
+        <header style="width:100%;">
+            <nav class="glass border-0">
+                <ul>
+                  <li>
+                    <a class="active" href="#home">Inicio</a>
+                    </li>
+                    <li class="dropdown float-end">
+                          <a class="dropbtn m-0 border-0">Opciones</a>
+                          <div class="dropdown-content">
+                          <a href="/change_password">Cambiar contrase&ntildea</a>
+                          <a href="/logout">Cerrar sesion</a>  
+                        </div>
+                    </li>
+                </ul>
+            </nav>
+        </header>
         <h1 class="white">Control LED via Web Server</h1>
-        <div class="white" style="margin-bottom: 10px;"><b>Estado del LED: <p id="statusText" style="display: inline;"></p></b></div>
+        <div class="white m-1"><b>Estado del LED: <p id="statusText" style="display: inline;"></p></b></div>
         
         <div id="btn-bg">
             <form id="led-btn" onsubmit="return test(this)">
             <input type="checkbox" id="btnControl"/>
                 <label class="btn" for="btnControl">
-                    <svg id="switch-button" xmlns="http://www.w3.org/2000/svg" version="1.0" width="300px" height="100px" viewBox="0 0 300.000000 100.000000" preserveAspectRatio="xMidYMid meet">
+                    <svg id="switch-button" xmlns="http://www.w3.org/2000/svg" version="1.0" width="100px" height="100px" viewBox="0 0 100.000000 100.000000" preserveAspectRatio="xMidYMid meet">
                     <g transform="translate(5, 88) scale(0.025,-0.025)" stroke="none">
                     <path d="M1295 2984 c-346 -53 -628 -197 -867 -442 -325 -335 -478 -794 -412 -1241 49 -336 180 -604 412 -843 524 -539 1330 -609 1951 -170 171 121 360 342 457 535 192 381 215 818 63 1212 -153 395 -470 712 -868 866 -224 87 -505 119 -736 83z m294 -412 c14 -10 35 -34 46 -53 18 -31 20 -55 23 -269 2 -129 0 -263 -3 -297 -11 -104 -70 -165 -160 -165 -58 0 -104 27 -132 78 -22 38 -23 47 -23 329 0 264 2 293 19 325 45 84 154 109 230 52z m-579 -262 c20 -5 51 -26 70 -45 29 -30 34 -43 38 -94 5 -68 -16 -114 -68 -151 -41 -29 -123 -135 -159 -207 -96 -189 -94 -422 6 -623 55 -110 179 -231 293 -288 105 -51 198 -73 310 -73 112 0 205 22 310 73 121 60 239 178 297 298 97 199 97 422 3 611 -34 68 -74 122 -151 205 -54 58 -64 85 -56 150 10 88 105 150 191 124 75 -23 227 -193 299 -335 47 -94 84 -226 97 -341 31 -302 -70 -591 -285 -808 -88 -89 -167 -144 -289 -202 -149 -70 -234 -88 -416 -88 -182 0 -267 18 -416 88 -122 58 -201 113 -289 202 -164 166 -261 371 -286 603 -32 307 77 600 301 815 93 89 132 105 200 86z"/>
                     </g>
@@ -123,7 +208,6 @@
                 statusText.style.color = 'red';  
             }
             statusText.style.opacity = '1';  
-
             let estado = this.checked ? 'on' : 'off'; // Determina el estado del LED
             // Enviar la solicitud usando fetch  
             fetch('/led?led_status=' + estado, { method: 'GET' })
