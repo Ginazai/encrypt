@@ -2,6 +2,9 @@
 #include <WiFiClientSecure.h>
 #include <WebServer.h>
 #include <ArduinoJson.h>
+#include <EEPROM.h>
+#include "SPIFFS.h"
+#include "mbedtls/aes.h"
 #include <mbedtls/base64.h>
 #include <mbedtls/md.h>
 #include <mbedtls/sha256.h>
@@ -30,6 +33,29 @@ String token = "";
 // Clave secreta para firmar el JWT (debe ser segura en producción)
 const char* secretKey = "my_super_secret_key";
 unsigned long jwtExpTime = 0;
+// Función para leer un archivo y devolver su contenido como un String
+String readFile(const char *route) {
+  // Verificar si SPIFFS está montado
+  if (!SPIFFS.begin(true)) {
+    Serial.println("Error al montar SPIFFS");
+    return "";
+  }
+  // Abrir el archivo en modo lectura
+  File file = SPIFFS.open(route, "r");
+  if (!file) {
+    Serial.println("Error al abrir el archivo");
+    return "";
+  }
+  // Leer el contenido del archivo y almacenarlo en un String
+  String content = "";
+  while (file.available()) {
+    content += (char)file.read();
+  }
+  // Cerrar el archivo
+  file.close();
+  
+  return content;
+}
 // Función para generar JWT
 String createJWT(const char* user) {
   // Crear el header en formato JSON
@@ -77,30 +103,6 @@ String createJWT(const char* user) {
   // Construir el JWT final
   String jwt = String(headerBase64) + "." + String(payloadBase64) + "." + String(signatureBase64);
   return jwt;
-}
-//Funcion de hashing
-void hashPassword(const char* password, char outputBuffer[65]) {
-  unsigned char hash[32];
-  mbedtls_sha256_context ctx;
-  
-  mbedtls_sha256_init(&ctx);
-  mbedtls_sha256_starts(&ctx, 0);  // 0 para SHA-256
-  mbedtls_sha256_update(&ctx, (const unsigned char*)password, strlen(password));
-  mbedtls_sha256_finish(&ctx, hash);
-  mbedtls_sha256_free(&ctx);
-
-  for (int i = 0; i < 32; i++) {
-      sprintf(outputBuffer + (i * 2), "%02x", hash[i]);
-  }
-}
-//JWT Token generation
-String generateToken() {
-  char token[33];
-  for (int i = 0; i < 32; i++) {
-      token[i] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"[random(62)];
-  }
-  token[32] = '\0';
-  return String(token);
 }
 //Funcion para sanitizar entradas de usuario (Solo permite caracteres alfanuméricos)
 bool isValidInput(String input) {
@@ -183,9 +185,12 @@ void loop()
       // Serial.println(body);
       if (headers.indexOf("POST /login") != -1) {
         handleLogin(client,body);
-      } else if (headers.indexOf("GET /led") != -1 && (token.length()>0&&token.equals(retrivedToken))) {
-        serveResponsePage(client);
-        handleLED(client,headers);
+      } else if (token.length()>0&&token.equals(retrivedToken)) {
+        if(headers.indexOf("GET /led") != -1) {
+          serveResponsePage(client);
+          handleLED(headers);
+          //keepAlive(headers);
+        }
       } else if (headers.indexOf("GET /logout") != -1) {
         token = "";
         client.println("HTTP/1.1 302 Found"); 
@@ -239,7 +244,7 @@ void handleLogin(WiFiClient client, String request) {
   }
 
   if (user.equals(correctUser) && pass.equals(correctPass)) {
-    jwtExpTime = millis() + 900000;
+    jwtExpTime = millis() + 60;
     token = createJWT(user.c_str());
     failedAttempts = 0;
     Serial.println("Login exitoso!");
@@ -259,13 +264,19 @@ void handleLogin(WiFiClient client, String request) {
   }
 }
 //Controlar LED
-void handleLED(WiFiClient client, String request) {
+void handleLED(String request) {
   if (request.indexOf("led_status=on") != -1) {
       digitalWrite(LED_PIN, HIGH);
       Serial.println("LED encendido");
   } else if (request.indexOf("led_status=off") != -1) {
       digitalWrite(LED_PIN, LOW);
       Serial.println("LED apagado");
+  }
+}
+//Keep session alive
+void keepAlive(String request) {
+  if (request.indexOf("reset=true") != -1) {
+    jwtExpTime = millis() + 60;
   }
 }
 // Servir la página de login
@@ -576,7 +587,12 @@ void serveResponsePage(WiFiClient client) {
   client.println("fetch('/led?led_status=' + estado, { method: 'GET' })");                                                                       
   client.println(".then(response => response.text())");                                                                          
   client.println(".catch(error => console.error('Error:', error));");                                                                       
-  client.println("});");                                                                      
+  client.println("});");      
+  client.println("function resetJwtTimer() {");
+  client.println("fetch('/reset').catch(err => console.error('Error:', err));");
+  client.println("}");
+  client.println("document.addEventListener('keydown', resetJwtTimer);");
+  client.println("document.addEventListener('click', resetJwtTimer);");                                                                
   client.println("</script>");                                                                       
   client.println("</body>");                                                                         
   client.println("</html>");                                                                     
