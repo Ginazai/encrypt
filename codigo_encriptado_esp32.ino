@@ -10,6 +10,25 @@
 #include <mbedtls/sha256.h>
 
 #define LED_PIN 2  // Onboard LED is usually on GPIO 2
+//Leer credenciales en hardware
+String retrieveData(uint8_t* element, int len){
+  String data = "";
+  for (int i = 0; i < len; i++) {
+    data += (char)element[i];
+  }
+  return data;
+}
+//AES Function
+void decryptAES(const uint8_t *input, uint8_t *output, size_t length) {
+  mbedtls_aes_context aes;
+  mbedtls_aes_init(&aes);
+  mbedtls_aes_setkey_enc(&aes, AES_KEY, 128);
+  // copia mutable del IV
+  uint8_t iv_copy[16];  
+  memcpy(iv_copy, IV, 16);  
+  mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, length, iv_copy, input, output);
+  mbedtls_aes_free(&aes);
+}
 //Credenciales temporales
 char correctUser[] = "admin";
 char correctPass[] = "abc123";
