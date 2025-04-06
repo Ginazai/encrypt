@@ -76,6 +76,7 @@ void setup() {
   encryptAES(username, encUsername, 16);
   encryptAES(password, encPassword, 32);
   delay(1000);
+  
   showContent(encUsername, 16);
   showContent(encPassword, 32);
   showContent(jwtKey,32);

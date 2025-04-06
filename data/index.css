@@ -2,6 +2,10 @@
 .m-0 {margin: 0px !important;}
 .m-1 {margin: 1em !important;}
 .m-2 {margin: 2em !important;}
+.mb-1 {margin-bottom: 1em !important;}
+.my-0 {margin-top: 0px;margin-bottom: 0px;}
+.my-1 {margin-top: 1em;margin-bottom: 1em;}
+.my-2 {margin-top: 2em;margin-bottom: 2em;}
 .border-0{border-radius: 0px !important;}
 .float-start{float: left !important;}
 .float-end{float: right !important;}
@@ -22,6 +26,9 @@ body {
     height: 100vh;
     text-align: center; 
     font-family: 'Trebuchet MS', sans-serif;
+}
+@font-face {
+  font-family: Trebuchet MS;
 }
 button { 
     margin: 20px; 
@@ -122,11 +129,10 @@ li a {
   text-decoration: none;
 }
 li a:hover:not(.active) {
-  background-color: grey;
+  background-color: rgba(255, 255, 255, 0.3);
 }
 .active {
-    color: black !important;
-  background-color: #FFFF;
+  background-color: rgba(255, 255, 255, 0.3);
 }
 /*    dropdown btn    */
 .dropbtn {
@@ -147,11 +153,13 @@ li a:hover:not(.active) {
   box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
   z-index: 0;
 }
-.dropdown-content a {
-  padding: 12px 16px;
-  text-decoration: none;
-  display: block;
+/*-------------------*/
+.toggle {
+  display: none;
 }
-.dropdown:hover .dropdown-content {
-  display: block;
+
+.emoji {
+  font-size: 1rem;
+  cursor: pointer;
+  user-select: none;
 }

@@ -1,3 +1,11 @@
+/*    General use styles     */
+.m-0 {margin: 0px !important;}
+.mt-0 {margin-top: 0px !important;}
+.me-0 {margin-right: 0px !important;}
+.my-1 {margin-top: 1em !important; margin-bottom: 1em !important;}
+.float-end{float: right !important;}
+.w-100{width: 100% !important;}
+/*    Specific styles    */
 body {
     background: linear-gradient(to bottom right, #3d3d3d, black) no-repeat;
     height: 100vh;
@@ -5,6 +13,9 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
+}
+@font-face {
+  font-family: Trebuchet MS;
 }
 #login-container-bg {
     position: absolute;
@@ -17,7 +28,7 @@ body {
     /* Add the blur effect */
     filter: blur(15px);
     -webkit-filter: blur(15px);
-    transform: translate(-50%, -50%);
+    transform: translate(-50%, -20%);
     z-index: 0;
     
     transition: width 1s, height 1s, transform 1s;
@@ -35,7 +46,7 @@ body {
 }
 #login-container:hover + #login-container-bg {    
     width: 20em;
-    height: 18em;
+    height: 22em;
     border-radius: 15px;
 
     transform: translate(-50%, -50%) translateY(5px);
