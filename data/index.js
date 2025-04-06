@@ -26,14 +26,14 @@ document.getElementById("options").addEventListener("click", () => {
 
         if(dropItem.style.display == "none"){
             dropItem.style.display = "block";
-            icon.innerHTML = '&#128899;';
+            icon.src = 'arrow-down-white.png';
             aTag.map((a) => {
                 a.style.display = "block";
             });
         } else {
             dropItem.style.display = "none";
             
-            icon.innerHTML = '&#128896;';
+            icon.src = 'arrow-left-white.png';
             aTag.map((a) => {
                 a.style.display = "none";
             });
