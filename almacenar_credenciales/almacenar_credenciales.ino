@@ -6,7 +6,6 @@
 #define JWT_KEY_SIZE         32
 #define ENCRYPTED_USER_SIZE  16
 #define ENCRYPTED_PASS_SIZE  16
-
 // Direcciones base
 #define ADDR_AES_KEY         0
 #define ADDR_IV              (ADDR_AES_KEY + AES_KEY_SIZE)

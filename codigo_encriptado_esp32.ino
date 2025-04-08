@@ -3,13 +3,32 @@
 #include <EEPROM.h>
 #include <SPIFFS.h>
 #include <FS.h>
-#include <ArduinoJson.h>
+// #include <ArduinoJson.h>
 #include "mbedtls/aes.h"
 #include <mbedtls/base64.h>
 #include <mbedtls/md.h>
 #include <mbedtls/sha256.h>
 
-#define LED_PIN 2  // Onboard LED is usually on GPIO 2
+// Tamaños definidos
+#define AES_KEY_SIZE         16
+#define IV_SIZE              16
+#define JWT_KEY_SIZE         32
+#define ENCRYPTED_USER_SIZE  16
+#define ENCRYPTED_PASS_SIZE  16
+// Direcciones base
+#define ADDR_AES_KEY         0
+#define ADDR_IV              (ADDR_AES_KEY + AES_KEY_SIZE)
+#define ADDR_JWT_KEY         (ADDR_IV + IV_SIZE)
+#define ADDR_ENC_USER        (ADDR_JWT_KEY + JWT_KEY_SIZE)
+#define ADDR_ENC_PASS        (ADDR_ENC_USER + ENCRYPTED_USER_SIZE)
+// Onboard LED
+#define LED_PIN 2  
+//Variables a ser recuperadas de la EEPROM
+uint8_t aesKey[AES_KEY_SIZE];
+uint8_t iv[IV_SIZE];
+uint8_t jwtKey[JWT_KEY_SIZE];
+uint8_t encryptedUser[ENCRYPTED_USER_SIZE];
+uint8_t encryptedPass[ENCRYPTED_PASS_SIZE];
 //Leer credenciales en hardware
 String retrieveData(uint8_t* element, int len){
   String data = "";
@@ -18,14 +37,56 @@ String retrieveData(uint8_t* element, int len){
   }
   return data;
 }
+//Leer data de la EEPROM
+void readEEPROMData() {
+  for (int i = 0; i < AES_KEY_SIZE; i++) aesKey[i] = EEPROM.read(ADDR_AES_KEY + i);
+  for (int i = 0; i < IV_SIZE; i++) iv[i] = EEPROM.read(ADDR_IV + i);
+  for (int i = 0; i < JWT_KEY_SIZE; i++) jwtKey[i] = EEPROM.read(ADDR_JWT_KEY + i);
+  for (int i = 0; i < ENCRYPTED_USER_SIZE; i++) encryptedUser[i] = EEPROM.read(ADDR_ENC_USER + i);
+  for (int i = 0; i < ENCRYPTED_PASS_SIZE; i++) encryptedPass[i] = EEPROM.read(ADDR_ENC_PASS + i);
+
+  Serial.println("\n=== Datos leídos desde EEPROM ===");
+  Serial.println("AES Key:");
+  printByteArray(aesKey, AES_KEY_SIZE);
+
+  Serial.println("IV:");
+  printByteArray(iv, IV_SIZE);
+
+  Serial.println("JWT Key (simulada):");
+  printByteArray(jwtKey, JWT_KEY_SIZE);
+
+  Serial.println("Usuario:");
+  printTextOrHex(encryptedUser, ENCRYPTED_USER_SIZE);
+
+  Serial.println("Contraseña:");
+  printTextOrHex(encryptedPass, ENCRYPTED_PASS_SIZE);
+}
+void printTextOrHex(uint8_t* arr, int len) {
+  for (int i = 0; i < len; i++) {
+    if (isPrintable(arr[i])) {
+      Serial.print((char)arr[i]);
+    } else {
+      Serial.print(".");
+    }
+  }
+  Serial.println();
+}
+void printByteArray(uint8_t* arr, int len) {
+  for (int i = 0; i < len; i++) {
+    if (arr[i] < 16) Serial.print("0");
+    Serial.print(arr[i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println();
+}
 //AES Function
 void decryptAES(const uint8_t *input, uint8_t *output, size_t length) {
   mbedtls_aes_context aes;
   mbedtls_aes_init(&aes);
-  mbedtls_aes_setkey_enc(&aes, AES_KEY, 128);
+  mbedtls_aes_setkey_enc(&aes, aesKey, 128);
   // copia mutable del IV
   uint8_t iv_copy[16];  
-  memcpy(iv_copy, IV, 16);  
+  memcpy(iv_copy, iv, 16);  
   mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, length, iv_copy, input, output);
   mbedtls_aes_free(&aes);
 }
@@ -39,6 +100,12 @@ WiFiServer server(80);
 
 // const char* ssid = "";
 // const char* password = "";
+const char* ssid = "TECNO SPARK 20";
+const char* password = "u4dvfrq9yquaydm";
+// const char* ssid = ".TigoWiFi-307776204/0";
+// const char* password = "WiFi-94330935";
+// const char* ssid = ".TigoWiFi-253467004/0";
+// const char* password = "WiFi-89775044";
 
 int failedAttempts = 0;
 unsigned long lockoutTime = 0;
