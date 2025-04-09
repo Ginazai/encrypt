@@ -1,6 +1,6 @@
 #include <EEPROM.h>
 #include <mbedtls/sha256.h>
-#include "mbedtls/aes.h"
+#include <mbedtls/aes.h>
 
 // Tamaños definidos
 #define EEPROM_SIZE          128
@@ -17,6 +17,20 @@
 #define ADDR_ENC_PASS        (ADDR_ENC_USER + ENCRYPTED_USER_SIZE)
 
 String inputUser, inputPass, inputJwt;
+
+// Claves estáticas (puedes cambiarlas)
+uint8_t aesKey[AES_KEY_SIZE] = { 
+  0xff, 0xcc, 0xcf, 0x3e, 0x0d, 
+  0xe0, 0x3d, 0xf1, 0x5a, 0xb8, 
+  0x39, 0xdc, 0x72, 0x79, 0xeb, 0x3f 
+}; 
+
+uint8_t iv[IV_SIZE] = { 
+  0xa9, 0x31, 0x62, 0x8d, 
+  0x2a, 0x26, 0x4f, 0x0f, 
+  0x01, 0xa3, 0x6e, 0x63, 
+  0x38, 0xb5, 0xc9, 0xb2 
+};
 
 void setup() {
   Serial.begin(115200);
@@ -47,7 +61,17 @@ void getUserInput(String message, String &input) {
     }
   }
 }
-
+//Funcion para encriptar datos con AES
+void encryptAES(const uint8_t *input, uint8_t *output, size_t length) {
+  mbedtls_aes_context aes;
+  mbedtls_aes_init(&aes);
+  mbedtls_aes_setkey_enc(&aes, aesKey, 128);
+  // copia mutable del IV
+  uint8_t iv_copy[16];  
+  memcpy(iv_copy, iv, 16);  
+  mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, length, iv_copy, input, output);
+  mbedtls_aes_free(&aes);
+}
 // hash a 32 bytes
 void sha256Hash(const String &input, uint8_t* output) {
   // Convertir String de Arduino a array de bytes
@@ -64,33 +88,24 @@ void sha256Hash(const String &input, uint8_t* output) {
 }
 
 void writeEEPROMData(String user, String pass, String jwt) {
-  // Claves estáticas (puedes cambiarlas)
-  uint8_t aesKey[AES_KEY_SIZE] = { 
-    0xff, 0xcc, 0xcf, 0x3e, 0x0d, 
-    0xe0, 0x3d, 0xf1, 0x5a, 0xb8, 
-    0x39, 0xdc, 0x72, 0x79, 0xeb, 0x3f 
-  }; 
-
-  uint8_t iv[IV_SIZE] = { 
-    0xa9, 0x31, 0x62, 0x8d, 
-    0x2a, 0x26, 0x4f, 0x0f, 
-    0x01, 0xa3, 0x6e, 0x63, 
-    0x38, 0xb5, 0xc9, 0xb2 
-  };
-
   uint8_t jwtKey[JWT_KEY_SIZE];
   sha256Hash(jwt, jwtKey);
 
-  uint8_t encryptedUser[ENCRYPTED_USER_SIZE] = {0};
-  uint8_t encryptedPass[ENCRYPTED_PASS_SIZE] = {0};
+  uint8_t tempUser[ENCRYPTED_USER_SIZE] = {0};
+  uint8_t tempPass[ENCRYPTED_PASS_SIZE] = {0};
 
   // Copiar strings al buffer limitado
   for (int i = 0; i < ENCRYPTED_USER_SIZE && i < user.length(); i++) {
-    encryptedUser[i] = user[i];
+    tempUser[i] = user[i];
   }
   for (int i = 0; i < ENCRYPTED_PASS_SIZE && i < pass.length(); i++) {
-    encryptedPass[i] = pass[i];
+    tempPass[i] = pass[i];
   }
+
+  uint8_t encryptedUser[ENCRYPTED_USER_SIZE] = {0};
+  uint8_t encryptedPass[ENCRYPTED_PASS_SIZE] = {0};
+  encryptAES(tempUser,encryptedUser,ENCRYPTED_USER_SIZE);
+  encryptAES(tempPass,encryptedPass,ENCRYPTED_PASS_SIZE);
 
   // Escritura
   for (int i = 0; i < AES_KEY_SIZE; i++) EEPROM.write(ADDR_AES_KEY + i, aesKey[i]);

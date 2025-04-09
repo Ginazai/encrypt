@@ -4,7 +4,7 @@
 #include <SPIFFS.h>
 #include <FS.h>
 #include <ArduinoJson.h>
-#include "mbedtls/aes.h"
+#include <mbedtls/aes.h>
 #include <mbedtls/base64.h>
 #include <mbedtls/md.h>
 #include <mbedtls/sha256.h>
@@ -332,7 +332,21 @@ void handleLogin(WiFiClient client, String request) {
   //   client.println("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nBad credentials");
   //   return;
   // }
-  if ((memcmp(encryptedUser, user.c_str(), user.length()) == 0) && (memcmp(encryptedPass, pass.c_str(), pass.length()) == 0)) {
+  uint8_t tempUser[ENCRYPTED_USER_SIZE] = {0};
+  uint8_t tempPass[ENCRYPTED_PASS_SIZE] = {0};
+  // Copiar strings al buffer limitado
+  for (int i = 0; i < ENCRYPTED_USER_SIZE && i < user.length(); i++) {
+    tempUser[i] = user[i];
+  }
+  for (int i = 0; i < ENCRYPTED_PASS_SIZE && i < pass.length(); i++) {
+    tempPass[i] = pass[i];
+  }
+  uint8_t outputUser[ENCRYPTED_USER_SIZE] = {0};
+  uint8_t outputPass[ENCRYPTED_PASS_SIZE] = {0};
+  encryptAES(tempUser,encryptedUser,ENCRYPTED_USER_SIZE);
+  encryptAES(tempPass,encryptedPass,ENCRYPTED_PASS_SIZE);
+  
+  if ((memcmp(encryptedUser, outputUser.c_str(), outputUser.length()) == 0) && (memcmp(encryptedPass, outputPass.c_str(), outputPass.length()) == 0)) {
     jwtExpTime = millis() + 60;
     token = createJWT(user.c_str());
     failedAttempts = 0;
