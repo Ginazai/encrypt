@@ -112,6 +112,7 @@ WiFiServer server(80);
 // const char* ssid = "";
 // const char* password = "";
 
+
 int failedAttempts = 0;
 unsigned long lockoutTime = 0;
 String token = "";
@@ -331,17 +332,7 @@ void handleLogin(WiFiClient client, String request) {
   //   client.println("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nBad credentials");
   //   return;
   // }
-  Serial.println(user);
-  Serial.println(pass);
-  printTextOrHex(encryptedUser, ENCRYPTED_USER_SIZE);
-  printTextOrHex(encryptedPass, ENCRYPTED_USER_SIZE);
-  uint8_t temp_user[ENCRYPTED_USER_SIZE];
-  uint8_t temp_pass[ENCRYPTED_PASS_SIZE];
-  memcpy(temp_user, user.c_str(), user.length());
-  memcpy(temp_pass, pass.c_str(), pass.length());
-  printTextOrHex(temp_user, ENCRYPTED_USER_SIZE);
-  printTextOrHex(temp_pass, ENCRYPTED_USER_SIZE);
-  if ((memcmp(temp_user, encryptedUser, user.length()) == 0) && (memcmp(temp_user, encryptedPass, pass.length()) == 0)) {
+  if ((memcmp(encryptedUser, user.c_str(), user.length()) == 0) && (memcmp(encryptedPass, pass.c_str(), pass.length()) == 0)) {
     jwtExpTime = millis() + 60;
     token = createJWT(user.c_str());
     failedAttempts = 0;
