@@ -3,13 +3,14 @@
 #include <EEPROM.h>
 #include <SPIFFS.h>
 #include <FS.h>
-// #include <ArduinoJson.h>
+#include <ArduinoJson.h>
 #include "mbedtls/aes.h"
 #include <mbedtls/base64.h>
 #include <mbedtls/md.h>
 #include <mbedtls/sha256.h>
 
 // Tamaños definidos
+#define EEPROM_SIZE          128
 #define AES_KEY_SIZE         16
 #define IV_SIZE              16
 #define JWT_KEY_SIZE         32
@@ -90,9 +91,19 @@ void decryptAES(const uint8_t *input, uint8_t *output, size_t length) {
   mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, length, iv_copy, input, output);
   mbedtls_aes_free(&aes);
 }
+void encryptAES(const uint8_t *input, uint8_t *output, size_t length) {
+  mbedtls_aes_context aes;
+  mbedtls_aes_init(&aes);
+  mbedtls_aes_setkey_enc(&aes, aesKey, 128);
+  // copia mutable del IV
+  uint8_t iv_copy[16];  
+  memcpy(iv_copy, iv, 16);  
+  mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, length, iv_copy, input, output);
+  mbedtls_aes_free(&aes);
+}
 //Credenciales temporales
-char correctUser[] = "admin";
-char correctPass[] = "abc123";
+// uint8_t correctUser[];
+// uint8_t correctPass[];
 
 // Initialize the server library
 // (port 80 is default for HTTP):
@@ -100,18 +111,12 @@ WiFiServer server(80);
 
 // const char* ssid = "";
 // const char* password = "";
-const char* ssid = "TECNO SPARK 20";
-const char* password = "u4dvfrq9yquaydm";
-// const char* ssid = ".TigoWiFi-307776204/0";
-// const char* password = "WiFi-94330935";
-// const char* ssid = ".TigoWiFi-253467004/0";
-// const char* password = "WiFi-89775044";
 
 int failedAttempts = 0;
 unsigned long lockoutTime = 0;
 String token = "";
 // Clave secreta para firmar el JWT (debe ser segura en producción)
-const char* secretKey = "my_super_secret_key";
+const char* secretKey = (char*)jwtKey;
 unsigned long jwtExpTime = 0;
 // Función para generar JWT
 String createJWT(const char* user) {
@@ -187,6 +192,9 @@ void initWiFi() {
 void setup() 
 {
   Serial.begin(115200);// Open serial communications and wait for port to open:
+  EEPROM.begin(EEPROM_SIZE);
+  delay(1000);
+  readEEPROMData();
   // Initialize SPIFFS
   if(!SPIFFS.begin(true)){
     Serial.println("An Error has occurred while mounting SPIFFS");
@@ -318,13 +326,22 @@ void handleLogin(WiFiClient client, String request) {
   user.trim();
   pass.trim();
 
-  if (!isValidInput(user) || !isValidInput(pass)) {
-    Serial.println("Error: User y Password deben ser alfanumericos.");
-    client.println("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nBad credentials");
-    return;
-  }
-
-  if (user.equals(correctUser) && pass.equals(correctPass)) {
+  // if (!isValidInput(user) || !isValidInput(pass)) {
+  //   Serial.println("Error: User y Password deben ser alfanumericos.");
+  //   client.println("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nBad credentials");
+  //   return;
+  // }
+  Serial.println(user);
+  Serial.println(pass);
+  printTextOrHex(encryptedUser, ENCRYPTED_USER_SIZE);
+  printTextOrHex(encryptedPass, ENCRYPTED_USER_SIZE);
+  uint8_t temp_user[ENCRYPTED_USER_SIZE];
+  uint8_t temp_pass[ENCRYPTED_PASS_SIZE];
+  memcpy(temp_user, user.c_str(), user.length());
+  memcpy(temp_pass, pass.c_str(), pass.length());
+  printTextOrHex(temp_user, ENCRYPTED_USER_SIZE);
+  printTextOrHex(temp_pass, ENCRYPTED_USER_SIZE);
+  if ((memcmp(temp_user, encryptedUser, user.length()) == 0) && (memcmp(temp_user, encryptedPass, pass.length()) == 0)) {
     jwtExpTime = millis() + 60;
     token = createJWT(user.c_str());
     failedAttempts = 0;

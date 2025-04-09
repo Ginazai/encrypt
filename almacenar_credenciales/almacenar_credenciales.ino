@@ -1,6 +1,9 @@
 #include <EEPROM.h>
+#include <mbedtls/sha256.h>
+#include "mbedtls/aes.h"
 
 // Tamaños definidos
+#define EEPROM_SIZE          128
 #define AES_KEY_SIZE         16
 #define IV_SIZE              16
 #define JWT_KEY_SIZE         32
@@ -16,7 +19,8 @@
 String inputUser, inputPass, inputJwt;
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
+  EEPROM.begin(EEPROM_SIZE);
   delay(1000);
   Serial.println("=== Configuracion de EEPROM ===");
   
@@ -44,11 +48,19 @@ void getUserInput(String message, String &input) {
   }
 }
 
-// Simula un hash a 32 bytes para fines de demostración
-void fakeSHA256(const String &input, uint8_t* output) {
-  for (int i = 0; i < JWT_KEY_SIZE; i++) {
-    output[i] = (uint8_t)(input[i % input.length()] + i);  // Simulación simple
-  }
+// hash a 32 bytes
+void sha256Hash(const String &input, uint8_t* output) {
+  // Convertir String de Arduino a array de bytes
+  const char* inputStr = input.c_str();
+  size_t inputLen = strlen(inputStr);
+
+  // Calcular hash SHA-256
+  mbedtls_sha256_context ctx;
+  mbedtls_sha256_init(&ctx);
+  mbedtls_sha256_starts(&ctx, 0); // 0 = SHA-256 (no SHA-224)
+  mbedtls_sha256_update(&ctx, (const unsigned char*)inputStr, inputLen);
+  mbedtls_sha256_finish(&ctx, output);
+  mbedtls_sha256_free(&ctx);
 }
 
 void writeEEPROMData(String user, String pass, String jwt) {
@@ -67,7 +79,7 @@ void writeEEPROMData(String user, String pass, String jwt) {
   };
 
   uint8_t jwtKey[JWT_KEY_SIZE];
-  fakeSHA256(jwt, jwtKey);
+  sha256Hash(jwt, jwtKey);
 
   uint8_t encryptedUser[ENCRYPTED_USER_SIZE] = {0};
   uint8_t encryptedPass[ENCRYPTED_PASS_SIZE] = {0};
@@ -87,6 +99,7 @@ void writeEEPROMData(String user, String pass, String jwt) {
   for (int i = 0; i < ENCRYPTED_USER_SIZE; i++) EEPROM.write(ADDR_ENC_USER + i, encryptedUser[i]);
   for (int i = 0; i < ENCRYPTED_PASS_SIZE; i++) EEPROM.write(ADDR_ENC_PASS + i, encryptedPass[i]);
 
+  EEPROM.commit();
   Serial.println("✅ Datos escritos en EEPROM.");
 }
 
