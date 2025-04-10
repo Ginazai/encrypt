@@ -49,7 +49,7 @@ body {
     height: 22em;
     border-radius: 15px;
 
-    transform: translate(-50%, -50%) translateY(5px);
+    transform: translate(-50%, -50%) translateY(2em);
 }
 input {
     display: block;

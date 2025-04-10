@@ -46,31 +46,31 @@ void readEEPROMData() {
   for (int i = 0; i < ENCRYPTED_USER_SIZE; i++) encryptedUser[i] = EEPROM.read(ADDR_ENC_USER + i);
   for (int i = 0; i < ENCRYPTED_PASS_SIZE; i++) encryptedPass[i] = EEPROM.read(ADDR_ENC_PASS + i);
 
-  Serial.println("\n=== Datos leídos desde EEPROM ===");
-  Serial.println("AES Key:");
-  printByteArray(aesKey, AES_KEY_SIZE);
+//   Serial.println("\n=== Datos leídos desde EEPROM ===");
+//   Serial.println("AES Key:");
+//   printByteArray(aesKey, AES_KEY_SIZE);
 
-  Serial.println("IV:");
-  printByteArray(iv, IV_SIZE);
+//   Serial.println("IV:");
+//   printByteArray(iv, IV_SIZE);
 
-  Serial.println("JWT Key (simulada):");
-  printByteArray(jwtKey, JWT_KEY_SIZE);
+//   Serial.println("JWT Key (simulada):");
+//   printByteArray(jwtKey, JWT_KEY_SIZE);
 
-  Serial.println("Usuario:");
-  printTextOrHex(encryptedUser, ENCRYPTED_USER_SIZE);
+//   Serial.println("Usuario:");
+//   printTextOrHex(encryptedUser, ENCRYPTED_USER_SIZE);
 
-  Serial.println("Contraseña:");
-  printTextOrHex(encryptedPass, ENCRYPTED_PASS_SIZE);
-}
-void printTextOrHex(uint8_t* arr, int len) {
-  for (int i = 0; i < len; i++) {
-    if (isPrintable(arr[i])) {
-      Serial.print((char)arr[i]);
-    } else {
-      Serial.print(".");
-    }
-  }
-  Serial.println();
+//   Serial.println("Contraseña:");
+//   printTextOrHex(encryptedPass, ENCRYPTED_PASS_SIZE);
+// }
+// void printTextOrHex(uint8_t* arr, int len) {
+//   for (int i = 0; i < len; i++) {
+//     if (isPrintable(arr[i])) {
+//       Serial.print((char)arr[i]);
+//     } else {
+//       Serial.print(".");
+//     }
+//   }
+//   Serial.println();
 }
 void printByteArray(uint8_t* arr, int len) {
   for (int i = 0; i < len; i++) {
@@ -111,7 +111,6 @@ WiFiServer server(80);
 
 // const char* ssid = "";
 // const char* password = "";
-
 
 int failedAttempts = 0;
 unsigned long lockoutTime = 0;
@@ -261,7 +260,9 @@ void loop()
       if (headers.indexOf("GET /index.css") != -1) {serveResource(client, "/index.css", "text/css");}
       if (headers.indexOf("GET /password_change.css") != -1) {serveResource(client, "/password_change.css", "text/css");}
       if (headers.indexOf("GET /logo.png") != -1) {serveResource(client,"/logo.png", "image/png");}
-      delay(100); //Allow time to load resources before pages
+      if (headers.indexOf("GET /arrow-down-white.png") != -1) {serveResource(client,"/arrow-down-white.png", "image/png");}
+      if (headers.indexOf("GET /arrow-left-white.png") != -1) {serveResource(client,"/arrow-left-white.png", "image/png");}
+      delay(500); //Allow time to load resources before pages
       if (headers.indexOf("POST /login HTTP/1.1") != -1) {
         handleLogin(client,body);
       } else if (token.length()>0&&token.equals(retrivedToken)) {
@@ -280,11 +281,9 @@ void loop()
         } else if (headers.indexOf("GET /change_password HTTP/1.1") != -1) {
           serveResource(client,"/password_change.html", "text/html");
         } else if (headers.indexOf("POST /cpassword") != -1) {
-          Serial.println("Requested to change password");
-          client.println("HTTP/1.1 302 Found"); 
-          client.println("Location: /led");  // Redirigir a led
-          client.println("Content-Type: text/html");
-          client.println(); 
+          handlePasswordChange(client,body);
+          delay(100);
+          readEEPROMData();
         }
       } else {
         serveResource(client,"/login.html", "text/html");
@@ -327,11 +326,11 @@ void handleLogin(WiFiClient client, String request) {
   user.trim();
   pass.trim();
 
-  // if (!isValidInput(user) || !isValidInput(pass)) {
-  //   Serial.println("Error: User y Password deben ser alfanumericos.");
-  //   client.println("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nBad credentials");
-  //   return;
-  // }
+  if (!isValidInput(user) || !isValidInput(pass)) {
+    Serial.println("Error: User y Password deben ser alfanumericos.");
+    client.println("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nBad credentials");
+    return;
+  }
   uint8_t tempUser[ENCRYPTED_USER_SIZE] = {0};
   uint8_t tempPass[ENCRYPTED_PASS_SIZE] = {0};
   // Copiar strings al buffer limitado
@@ -343,10 +342,9 @@ void handleLogin(WiFiClient client, String request) {
   }
   uint8_t outputUser[ENCRYPTED_USER_SIZE] = {0};
   uint8_t outputPass[ENCRYPTED_PASS_SIZE] = {0};
-  encryptAES(tempUser,encryptedUser,ENCRYPTED_USER_SIZE);
-  encryptAES(tempPass,encryptedPass,ENCRYPTED_PASS_SIZE);
-  
-  if ((memcmp(encryptedUser, outputUser.c_str(), outputUser.length()) == 0) && (memcmp(encryptedPass, outputPass.c_str(), outputPass.length()) == 0)) {
+  encryptAES(tempUser,outputUser,ENCRYPTED_USER_SIZE);
+  encryptAES(tempPass,outputPass,ENCRYPTED_PASS_SIZE);
+  if ((memcmp(encryptedUser, outputUser, ENCRYPTED_USER_SIZE) == 0) && (memcmp(encryptedPass, outputPass, ENCRYPTED_PASS_SIZE) == 0)) {
     jwtExpTime = millis() + 60;
     token = createJWT(user.c_str());
     failedAttempts = 0;
@@ -380,6 +378,73 @@ void handleLED(String request) {
 void keepAlive(String request) {
   if (request.indexOf("reset=true") != -1) {
     jwtExpTime = millis() + 60;
+  }
+}
+//Manejar cambio de contrasena
+void handlePasswordChange(WiFiClient client, String request) {
+  int newPassPos = request.indexOf("new_pass=");
+  int passPos = request.indexOf("confirm_pass=");
+
+  if (newPassPos == -1 || passPos == -1) {
+    Serial.println("Error: Los campos no pueden estar vacio.");
+    client.println("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nMissing credentials");
+    return;
+  }
+
+  int newPassEnd = request.indexOf("&", newPassPos);
+  int passEnd = request.indexOf(" ", passPos);
+
+  if (newPassEnd == -1) newPassEnd = passPos - 1;
+  if (passEnd == -1) passEnd = request.length();
+
+  String new_pass = request.substring(newPassPos + 9, newPassEnd);
+  String pass = request.substring(passPos + 13, passEnd);
+
+  new_pass.trim();
+  pass.trim();
+
+  if (!isValidInput(new_pass) || !isValidInput(pass)) {
+    Serial.println("Error: El Password deben ser alfanumerico.");
+    client.println("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nEl Password deben ser alfanumerico.");
+    return;
+  }
+  if (new_pass.length() < 8 || new_pass.length() > 16) {
+    Serial.println("Error: La contra&ntilde;a debe ser de entre 8 y 16 caracteres.");
+    client.println("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nLa contra&ntilde;a debe ser de entre 8 y 16 caracteres.");
+    return;
+  }
+  if (pass.length() < 8 || pass.length() > 16) {
+    Serial.println("Error: La contra&ntilde;a debe ser de entre 8 y 16 caracteres.");
+    client.println("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nMissing credentials");
+    return;
+  }
+
+  uint8_t tempNewPass[ENCRYPTED_USER_SIZE] = {0};
+  uint8_t tempPass[ENCRYPTED_PASS_SIZE] = {0};
+  // Copiar strings al buffer limitado
+  for (int i = 0; i < ENCRYPTED_USER_SIZE && i < new_pass.length(); i++) {
+    tempNewPass[i] = new_pass[i];
+  }
+  for (int i = 0; i < ENCRYPTED_PASS_SIZE && i < pass.length(); i++) {
+    tempPass[i] = pass[i];
+  }
+  uint8_t outputNew[ENCRYPTED_USER_SIZE] = {0};
+  uint8_t outputPass[ENCRYPTED_PASS_SIZE] = {0};
+
+  encryptAES(tempNewPass,outputNew,ENCRYPTED_PASS_SIZE);
+  encryptAES(tempPass,outputPass,ENCRYPTED_PASS_SIZE);
+
+  if ((memcmp(outputPass, outputNew, ENCRYPTED_PASS_SIZE) == 0)) {
+    for (int i = 0; i < ENCRYPTED_PASS_SIZE; i++) EEPROM.write(ADDR_ENC_PASS + i, outputPass[i]);
+    EEPROM.commit();
+    Serial.println("Contrasena modificada!");
+    client.println("HTTP/1.1 302 Found");  // Redirección HTTP
+    client.println("Location: /led");  // Redirigir a /led
+    client.println("Set-Cookie: token=" + token + "; Path=/; HttpOnly; SameSite=Strict");
+    client.println("Content-Type: text/html");
+    client.println();
+  } else {
+    client.println("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nPasswords don't match.");
   }
 }
 //Serve web resources

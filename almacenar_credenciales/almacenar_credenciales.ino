@@ -36,12 +36,16 @@ void setup() {
   Serial.begin(115200);
   EEPROM.begin(EEPROM_SIZE);
   delay(1000);
+  for (int i=0;i < EEPROM.length(); i++) {
+    EEPROM.write(i,0);
+  }
+  delay(1000);
   Serial.println("=== Configuracion de EEPROM ===");
   
   // Solicitar datos por puerto serial
   getUserInput("Ingrese el usuario (max 16 chars):", inputUser);
   getUserInput("Ingrese la contraseña (max 16 chars):", inputPass);
-  getUserInput("Ingrese la clave JWT (será convertida a SHA-256 simulada):", inputJwt);
+  getUserInput("Ingrese la clave JWT (será convertida a SHA-256):", inputJwt);
 
   writeEEPROMData(inputUser, inputPass, inputJwt);
   delay(1000);
@@ -115,7 +119,7 @@ void writeEEPROMData(String user, String pass, String jwt) {
   for (int i = 0; i < ENCRYPTED_PASS_SIZE; i++) EEPROM.write(ADDR_ENC_PASS + i, encryptedPass[i]);
 
   EEPROM.commit();
-  Serial.println("✅ Datos escritos en EEPROM.");
+  Serial.println("Datos escritos en EEPROM.");
 }
 
 void readEEPROMData() {
@@ -142,10 +146,10 @@ void readEEPROMData() {
   printByteArray(jwtKey, JWT_KEY_SIZE);
 
   Serial.println("Usuario:");
-  printTextOrHex(encryptedUser, ENCRYPTED_USER_SIZE);
+  printByteArray(encryptedUser, ENCRYPTED_USER_SIZE);
 
   Serial.println("Contraseña:");
-  printTextOrHex(encryptedPass, ENCRYPTED_PASS_SIZE);
+  printByteArray(encryptedPass, ENCRYPTED_PASS_SIZE);
 }
 
 void printByteArray(uint8_t* arr, int len) {
